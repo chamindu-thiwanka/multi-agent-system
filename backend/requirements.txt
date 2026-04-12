@@ -1,0 +1,178 @@
+# ================================================================
+# Multi-Agent System - Python Dependencies
+# ================================================================
+# Install: pip install -r backend/requirements.txt
+#
+# CATEGORIES:
+# 1. LangGraph + LangChain  - AI orchestration framework
+# 2. FastAPI + Uvicorn      - Backend web server
+# 3. ChromaDB               - Vector database for RAG
+# 4. Tavily                 - Internet search tool
+# 5. PRAW                   - Reddit API wrapper
+# 6. Pydantic               - Data validation and settings
+# 7. Utilities              - Logging, HTTP, document processing
+# ================================================================
+
+
+# ================================================================
+# 1. LANGGRAPH - Graph Orchestration (Core of our architecture)
+# ================================================================
+
+langgraph==0.2.55
+# Lets us define agent logic as a state machine graph.
+# Provides: StateGraph, nodes, edges, human-in-the-loop interrupts,
+# conditional routing, and graph state management.
+
+langgraph-checkpoint-sqlite==2.0.6
+# Saves LangGraph checkpoints (snapshots) to a SQLite file.
+# When the graph pauses for human approval, it saves its entire
+# state here. When human approves, it loads and resumes.
+
+
+# ================================================================
+# 2. LANGCHAIN - AI Framework and Tool Abstractions
+# ================================================================
+
+langchain==0.3.13
+# Foundation framework for LLM applications.
+# Provides: @tool decorator, ChatPromptTemplate, Document loaders,
+# text splitters, output parsers, and message handling.
+# Makes the system model-agnostic - swap LLMs without code changes.
+
+langchain-core==0.3.28
+# Base classes and abstractions used by all LangChain packages.
+# Required dependency for langchain and its integrations.
+
+langchain-community==0.3.13
+# Community-maintained integrations for LangChain.
+# We use it for: PDF loaders, text file loaders.
+
+langchain-ollama==0.2.2
+# Official LangChain integration for Ollama local models.
+# Provides ChatOllama (LLM) and OllamaEmbeddings.
+# Used when LLM_PROVIDER=ollama in config.
+
+langchain-chroma==0.1.4
+# Official LangChain integration for Chroma vector database.
+# Provides vector store operations and retriever interface.
+
+
+# ================================================================
+# 3. FASTAPI - Backend Web Server
+# ================================================================
+
+fastapi==0.115.6
+# Modern Python web framework for building REST APIs.
+# Creates our /query, /approve, /trace endpoints.
+# Auto-validates request data and generates API documentation.
+
+uvicorn[standard]==0.32.1
+# ASGI server that runs the FastAPI application.
+# FastAPI defines what to do; uvicorn handles HTTP connections.
+# [standard] adds websockets and faster HTTP parsing.
+
+python-multipart==0.0.20
+# Required by FastAPI for handling form data submissions.
+
+
+# ================================================================
+# 4. CHROMADB - Vector Database for RAG
+# ================================================================
+
+chromadb==0.5.23
+# Local vector database for storing and searching document embeddings.
+# Stores: document text, vector embeddings, and metadata.
+# Supports hybrid retrieval: vector similarity + metadata filtering.
+# Runs as a separate HTTP service on port 8001.
+
+
+# ================================================================
+# 5. TAVILY - Internet Search
+# ================================================================
+
+tavily-python==0.5.0
+# Python client for Tavily AI search API.
+# Returns clean structured search results designed for AI agents.
+# Free tier: 1000 searches/month at tavily.com
+
+
+# ================================================================
+# 6. PRAW - Reddit API
+# ================================================================
+
+praw==7.8.1
+# Python Reddit API Wrapper - official Reddit API library.
+# Lets us search posts, get comments, analyze subreddit discussions.
+# Used by the Reddit Intelligence Agent.
+
+
+# ================================================================
+# 7. PYDANTIC - Data Validation and Settings Management
+# ================================================================
+
+pydantic==2.10.4
+# Data validation using Python type hints.
+# Used for: GraphState definition, API request/response models,
+# and forcing LLMs to return structured JSON output.
+
+pydantic-settings==2.7.0
+# Extension for managing app settings via environment variables.
+# Our Settings class in config.py extends BaseSettings from here.
+# Automatically reads and validates values from the .env file.
+
+
+# ================================================================
+# 8. ENVIRONMENT CONFIGURATION
+# ================================================================
+
+python-dotenv==1.0.1
+# Reads .env file and loads values into environment variables.
+# Used during development so Python can access API keys.
+
+
+# ================================================================
+# 9. HTTP AND NETWORKING
+# ================================================================
+
+httpx==0.28.1
+# Modern async HTTP client. Used for service-to-service calls.
+# Supports async/await which FastAPI requires for efficiency.
+
+requests==2.32.3
+# Classic HTTP client. Used by PRAW and other dependencies internally.
+
+
+# ================================================================
+# 10. DOCUMENT PROCESSING
+# ================================================================
+
+pypdf==5.1.0
+# Reads and extracts text from PDF files.
+# Used in the document ingestion script to load PDFs into Chroma.
+
+
+# ================================================================
+# 11. UTILITIES
+# ================================================================
+
+python-json-logger==3.2.1
+# Formats log output as JSON instead of plain text.
+# Machine-readable logs are required for the observability criteria.
+# Example: {"timestamp": "...", "level": "INFO", "message": "..."}
+
+tenacity==9.0.0
+# Automatic retry logic for external API calls.
+# If Tavily or Reddit API fails temporarily, retries with backoff.
+# Prevents single transient failures from crashing the whole system.
+
+uuid7==0.1.0
+# Generates time-ordered unique IDs for sessions and traces.
+# UUID7 sorts chronologically unlike random UUID4.
+
+sse-starlette==2.1.3
+# Server-Sent Events for FastAPI.
+# This lets the backend STREAM updates to the frontend in real-time.
+# When the graph runs, frontend sees each step as it happens:
+# "Planner running..." then "RAG tool called..." then "Draft ready..."
+# Without this, frontend would have to wait for everything to finish.
+# SSE is simpler than WebSockets for one-way server-to-client streaming.
