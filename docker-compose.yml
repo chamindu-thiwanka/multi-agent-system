@@ -1,0 +1,135 @@
+# ================================================================
+# docker-compose.yml
+# ================================================================
+# This file defines ALL services that make up our system.
+# Run everything with: docker-compose up
+# Stop everything with: docker-compose down
+#
+# WHAT IS DOCKER COMPOSE?
+# Instead of starting each service manually, docker-compose.yml
+# describes all services and their relationships.
+# One command starts everything in the right order.
+#
+# SERVICES DEFINED HERE:
+# 1. chroma  - Vector database (running now, Phase 2)
+# 2. backend - FastAPI + LangGraph (Phase 5)
+# 3. frontend - HTML UI (Phase 6)
+# ================================================================
+
+version: "3.9"
+
+services:
+
+  # ============================================================
+  # CHROMA - Vector Database Service
+  # ============================================================
+  chroma:
+    # Use the official Chroma Docker image
+    # chromadb/chroma is maintained by the Chroma team
+    # :0.5.23 pins to exact version matching our Python package
+    # IMPORTANT: version must match chromadb==0.5.23 in requirements.txt
+    image: chromadb/chroma:0.5.23
+
+    # Port mapping: host_port:container_port
+    # 8001:8000 means:
+    #   - Chroma listens on port 8000 INSIDE the container
+    #   - We access it on port 8001 on OUR laptop
+    # Why 8001 and not 8000? Because our FastAPI backend uses 8000.
+    # Two services can't share the same port.
+    ports:
+      - "8001:8000"
+
+    # Volume mapping: where Chroma stores its data
+    # ./chroma_data  = folder on YOUR laptop (created automatically)
+    # /chroma/chroma = where Chroma expects data INSIDE the container
+    # This means: even if you stop/restart Chroma, all your
+    # ingested articles are preserved on your laptop's disk.
+    # Without this, data disappears when container stops.
+    volumes:
+      - ./chroma_data:/chroma/chroma
+
+    # Environment variables passed INTO the container
+    environment:
+      # IS_PERSISTENT=TRUE tells Chroma to save data to disk
+      # Without this, Chroma stores everything in memory only
+      # (data lost on restart)
+      - IS_PERSISTENT=TRUE
+
+      # Allow connections from any IP address
+      # Needed so our backend container can connect to Chroma
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+
+    # Restart policy: restart this container if it crashes
+    # "unless-stopped" means: restart automatically EXCEPT
+    # when you explicitly stop it with docker-compose down
+    restart: unless-stopped
+
+    # Health check: Docker periodically checks if Chroma is healthy
+    # If it fails, Docker restarts the container
+    healthcheck:
+      # curl the Chroma API endpoint
+      # --fail = exit with error if HTTP response is not 2xx
+      # --silent = don't show progress output
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s    # check every 30 seconds
+      timeout: 10s     # fail if no response within 10 seconds
+      retries: 3       # retry 3 times before marking unhealthy
+
+  # ============================================================
+  # BACKEND - FastAPI + LangGraph Service (added in Phase 5)
+  # ============================================================
+  backend:
+    # We'll build this image ourselves from backend/Dockerfile
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    ports:
+      - "8000:8000"
+
+    # Load all environment variables from our .env file
+    # The container gets access to all API keys and settings
+    env_file:
+      - .env
+
+    # Override specific env vars for Docker networking
+    # Inside Docker, services talk to each other by SERVICE NAME
+    # "chroma" = the chroma service defined above
+    # "host.docker.internal" = your laptop (where Ollama runs)
+    environment:
+      - CHROMA_HOST=chroma
+      - LLM_BASE_URL=http://host.docker.internal:11434
+      - EMBEDDING_BASE_URL=http://host.docker.internal:11434
+
+    # depends_on means: start chroma BEFORE starting backend
+    # The backend needs Chroma to be running first
+    depends_on:
+      chroma:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    # Mount the backend code into the container
+    # This means code changes on your laptop immediately
+    # reflect inside the container (no rebuild needed)
+    volumes:
+      - ./backend:/app
+
+  # ============================================================
+  # FRONTEND - HTML UI Service (added in Phase 6)
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      - BACKEND_URL=http://backend:8000
+
+    depends_on:
+      - backend
+
+    restart: unless-stopped
