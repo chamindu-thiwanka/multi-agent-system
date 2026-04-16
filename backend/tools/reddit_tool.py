@@ -405,11 +405,38 @@ def search_reddit(
                     if len(all_posts) >= max_posts:
                         break
 
+            # except Exception as sub_error:
+            #     # One subreddit failing shouldn't stop others
+            #     logger.warning(
+            #         f"Error searching r/{subreddit_name}: {sub_error}"
+            #     )
+            #     continue
             except Exception as sub_error:
-                # One subreddit failing shouldn't stop others
-                logger.warning(
-                    f"Error searching r/{subreddit_name}: {sub_error}"
-                )
+                error_str = str(sub_error)
+                # Detect Reddit API authorization errors specifically
+                # 401 = credentials rejected (pending approval)
+                # 403 = access forbidden
+                if "401" in error_str or "403" in error_str:
+                    logger.warning(
+                        f"Reddit API access not yet approved for "
+                        f"r/{subreddit_name}. "
+                        f"Submit access request at reddit.com/prefs/apps"
+                    )
+                    # Return informative message instead of crashing
+                    return (
+                        f"Reddit Intelligence: API access pending approval.\n"
+                        f"Query was: '{query}'\n"
+                        f"Reddit changed their API policy in 2023 and now "
+                        f"requires manual approval for new applications.\n"
+                        f"Once approved, this tool will automatically work "
+                        f"with the existing credentials.\n"
+                        f"The system continues to function using RAG and "
+                        f"internet search tools."
+                    )
+                else:
+                    logger.warning(
+                        f"Error searching r/{subreddit_name}: {sub_error}"
+                    )
                 continue
 
             if len(all_posts) >= max_posts:
