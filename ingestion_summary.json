@@ -1,11 +1,11 @@
 {
-  "ingestion_date": "2026-04-16T00:14:02.093603",
+  "ingestion_date": "2026-04-16T10:31:24.990375",
   "topics": [
     "machine learning artificial intelligence",
     "neurological disorders"
   ],
   "articles_per_topic": 100,
-  "total_articles_this_run": 111,
-  "total_chunks_this_run": 434,
+  "total_articles_this_run": 0,
+  "total_chunks_this_run": 0,
   "total_chunks_in_db": 434
 }
