@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Research System</title>
+    <style>
+        :root {
+            --bg-primary:     #0f1117;
+            --bg-secondary:   #1a1d27;
+            --bg-card:        #1e2130;
+            --bg-input:       #252837;
+            --border:         #2d3148;
+            --accent:         #6366f1;
+            --accent-hover:   #4f52d4;
+            --accent-green:   #22c55e;
+            --accent-yellow:  #eab308;
+            --accent-red:     #ef4444;
+            --text-primary:   #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted:     #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 { font-size: 1.4rem; font-weight: 600; }
+        .header h1 span { color: var(--accent); }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+        }
+        .status-dot.loading { background: var(--accent-yellow); animation: pulse 1s infinite; }
+        .status-dot.waiting { background: var(--accent); animation: pulse 1.5s infinite; }
+        .status-dot.error   { background: var(--accent-red); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ── Query Input ── */
+        .query-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .query-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }
+
+        .query-row { display: flex; gap: 12px; }
+
+        .query-input {
+            flex: 1;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .query-input:focus { border-color: var(--accent); }
+        .query-input::placeholder { color: var(--text-muted); }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-approve {
+            background: var(--accent-green);
+            color: white;
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            border-radius: 8px;
+        }
+        .btn-approve:hover:not(:disabled) { background: #16a34a; }
+        .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .examples {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .example-btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .example-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+
+        /* ── Loading bar ── */
+        .progress-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            display: none;
+            text-align: center;
+        }
+        .progress-section.visible { display: block; }
+
+        .progress-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .progress-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .progress-bar-bg {
+            background: var(--bg-input);
+            border-radius: 8px;
+            height: 6px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 8px;
+            width: 0%;
+            transition: width 0.5s ease;
+            animation: progressAnim 8s ease-in-out infinite;
+        }
+
+        @keyframes progressAnim {
+            0%   { width: 5%; }
+            20%  { width: 25%; }
+            40%  { width: 45%; }
+            60%  { width: 65%; }
+            80%  { width: 82%; }
+            95%  { width: 90%; }
+            100% { width: 90%; }
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            transition: color 0.3s;
+        }
+        .progress-step.active { color: var(--accent); }
+        .progress-step.done   { color: var(--accent-green); }
+
+        .step-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.3s;
+        }
+        .progress-step.active .step-dot { background: var(--accent); animation: pulse 1s infinite; }
+        .progress-step.done   .step-dot { background: var(--accent-green); }
+
+        .elapsed-time {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 12px;
+        }
+
+        /* ── Two Panel Layout ── */
+        .panels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            display: none;
+        }
+        .panels.visible { display: grid; }
+
+        @media (max-width: 768px) { .panels { grid-template-columns: 1fr; } }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .panel-badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: var(--bg-input);
+            color: var(--text-muted);
+        }
+        .panel-badge.active {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+        }
+        .panel-badge.done {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+        }
+
+        .panel-body {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            max-height: 480px;
+        }
+
+        /* ── Trace ── */
+        .trace-list { display: flex; flex-direction: column; gap: 6px; }
+
+        .trace-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .trace-icon { font-size: 0.9rem; margin-top: 1px; flex-shrink: 0; }
+        .trace-text { line-height: 1.4; }
+
+        .trace-entry.planner  { border-left: 2px solid var(--accent); }
+        .trace-entry.tool     { border-left: 2px solid var(--accent-yellow); }
+        .trace-entry.draft    { border-left: 2px solid #06b6d4; }
+        .trace-entry.verifier { border-left: 2px solid var(--accent-green); }
+        .trace-entry.human    { border-left: 2px solid var(--accent-green); }
+        .trace-entry.output   { border-left: 2px solid var(--accent-green); }
+
+        /* ── Draft ── */
+        .draft-content {
+            font-size: 0.88rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+        }
+
+        .approve-section {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .approve-label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        /* ── Final Answer ── */
+        .final-section {
+            background: var(--bg-card);
+            border: 1px solid var(--accent-green);
+            border-radius: 12px;
+            display: none;
+        }
+        .final-section.visible { display: block; }
+
+        .final-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .final-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .final-body { padding: 20px; }
+
+        .final-content {
+            font-size: 0.9rem;
+            line-height: 1.75;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+        }
+
+        .tools-used {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tool-tag {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+
+        /* ── Error ── */
+        .error-banner {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: #fca5a5;
+            display: none;
+            margin-top: 12px;
+        }
+        .error-banner.visible { display: block; }
+
+        .session-info {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: 'Consolas', monospace;
+            margin-top: 8px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Multi-Agent <span>Research System</span></h1>
+        <div class="status-badge">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- Query Input -->
+        <div class="query-section">
+            <div class="query-label">Research Query</div>
+            <div class="query-row">
+                <input
+                    type="text"
+                    class="query-input"
+                    id="queryInput"
+                    placeholder="Ask a research question about AI, machine learning, or neurological disorders..."
+                    autocomplete="off"
+                />
+                <button class="btn btn-primary" id="askBtn" onclick="submitQuery()">Ask</button>
+            </div>
+
+            <div class="examples">
+                <span style="font-size:0.75rem;color:var(--text-muted);margin-right:4px;">Try:</span>
+                <button class="example-btn" onclick="setQuery('What are recent AI approaches for detecting Alzheimers disease?')">AI + Alzheimer's</button>
+                <button class="example-btn" onclick="setQuery('How is deep learning used in neurological disorder diagnosis?')">Deep learning + neurology</button>
+                <button class="example-btn" onclick="setQuery('What machine learning models work best for brain MRI analysis?')">ML + brain MRI</button>
+                <button class="example-btn" onclick="setQuery('What are the latest developments in AI for Parkinsons disease?')">AI + Parkinson's</button>
+            </div>
+
+            <div class="error-banner" id="errorBanner"></div>
+            <div class="session-info" id="sessionInfo"></div>
+        </div>
+
+        <!-- 
+            PROGRESS SECTION
+            Shown while the backend is processing (2-10 minutes).
+            Shows animated progress bar and step indicators.
+            Replaces the old "waiting" state where nothing was visible.
+        -->
+        <div class="progress-section" id="progressSection">
+            <div class="progress-title">Agents are researching your question...</div>
+            <div class="progress-subtitle">
+                This takes 2-10 minutes with a local LLM. Please wait.
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+            <div class="progress-steps">
+                <div class="progress-step" id="step-plan">
+                    <div class="step-dot"></div> Planning
+                </div>
+                <div class="progress-step" id="step-rag">
+                    <div class="step-dot"></div> PubMed Search
+                </div>
+                <div class="progress-step" id="step-web">
+                    <div class="step-dot"></div> Web Search
+                </div>
+                <div class="progress-step" id="step-draft">
+                    <div class="step-dot"></div> Drafting
+                </div>
+                <div class="progress-step" id="step-verify">
+                    <div class="step-dot"></div> Verifying
+                </div>
+            </div>
+            <div class="elapsed-time" id="elapsedTime">Elapsed: 0s</div>
+        </div>
+
+        <!-- Two Panel Layout (hidden until results arrive) -->
+        <div class="panels" id="panels">
+
+            <!-- LEFT: Execution Trace -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Execution Trace</span>
+                    <span class="panel-badge done" id="traceBadge">Complete</span>
+                </div>
+                <div class="panel-body" id="tracePanel"></div>
+            </div>
+
+            <!-- RIGHT: Draft Answer + Approve -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Draft Answer</span>
+                    <span class="panel-badge active" id="draftBadge">Review Required</span>
+                </div>
+                <div class="panel-body" id="draftPanel"></div>
+                <div class="approve-section" id="approveSection">
+                    <div class="approve-label">
+                        Review the draft above, then approve to generate the final answer.
+                    </div>
+                    <button class="btn btn-approve" id="approveBtn" onclick="approveDraft()">
+                        ✓ Approve &amp; Generate Final Answer
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Final Answer (hidden until approved) -->
+        <div class="final-section" id="finalSection">
+            <div class="final-header">
+                <span>✓</span>
+                <span class="final-title">Final Answer</span>
+            </div>
+            <div class="final-body">
+                <div class="final-content" id="finalContent"></div>
+                <div class="tools-used" id="toolsUsed"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /*
+         * FRONTEND LOGIC
+         * ==============
+         * Uses polling (not SSE streaming) for reliability.
+         *
+         * FLOW:
+         * 1. POST /api/v1/query  → waits 2-10 minutes, returns draft + trace
+         * 2. Show draft + trace in two-panel layout
+         * 3. User clicks Approve
+         * 4. POST /api/v1/approve → returns final answer immediately
+         * 5. Show final answer
+         *
+         * WHY POLLING INSTEAD OF STREAMING:
+         * The SSE streaming approach had threading issues that caused
+         * trace events to not arrive at the frontend.
+         * Polling is simpler, more reliable, and works with any browser.
+         */
+
+        const BACKEND_URL = 'http://localhost:8000/api/v1';
+
+        let currentSessionId = null;
+        let isRunning = false;
+        let elapsedTimer = null;
+        let elapsedSeconds = 0;
+
+        // ── Helpers ──────────────────────────────────────────────
+
+        function setQuery(text) {
+            document.getElementById('queryInput').value = text;
+            document.getElementById('queryInput').focus();
+        }
+
+        function setStatus(state) {
+            const dot  = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            const map  = {
+                'ready':    { cls: '',        txt: 'Ready' },
+                'loading':  { cls: 'loading', txt: 'Processing...' },
+                'waiting':  { cls: 'waiting', txt: 'Awaiting Approval' },
+                'complete': { cls: '',        txt: 'Complete' },
+                'error':    { cls: 'error',   txt: 'Error' },
+            };
+            const s = map[state] || map['ready'];
+            dot.className = 'status-dot ' + s.cls;
+            text.textContent = s.txt;
+        }
+
+        function showError(msg) {
+            const b = document.getElementById('errorBanner');
+            b.textContent = '⚠ ' + msg;
+            b.classList.add('visible');
+            setStatus('error');
+            setRunning(false);
+            stopTimer();
+            hideProgress();
+        }
+
+        function clearError() {
+            document.getElementById('errorBanner').classList.remove('visible');
+        }
+
+        function setRunning(running) {
+            isRunning = running;
+            const btn   = document.getElementById('askBtn');
+            const input = document.getElementById('queryInput');
+            btn.disabled   = running;
+            input.disabled = running;
+            btn.innerHTML = running
+                ? '<span class="spinner"></span>Running...'
+                : 'Ask';
+        }
+
+        // ── Progress Steps Animation ──────────────────────────────
+        /*
+         * While the backend is processing we animate step indicators.
+         * Since we don't have real-time events, we simulate progress
+         * based on elapsed time. Typical timing:
+         * 0-30s   → Planning step
+         * 30-90s  → PubMed Search step
+         * 90-150s → Web Search step
+         * 150-300s → Drafting step
+         * 300s+   → Verifying step
+         */
+
+        function showProgress() {
+            document.getElementById('progressSection').classList.add('visible');
+            startTimer();
+            animateSteps();
+        }
+
+        function hideProgress() {
+            document.getElementById('progressSection').classList.remove('visible');
+        }
+
+        function startTimer() {
+            elapsedSeconds = 0;
+            stopTimer();
+            elapsedTimer = setInterval(() => {
+                elapsedSeconds++;
+                document.getElementById('elapsedTime').textContent =
+                    `Elapsed: ${elapsedSeconds}s`;
+                animateSteps();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (elapsedTimer) {
+                clearInterval(elapsedTimer);
+                elapsedTimer = null;
+            }
+        }
+
+        function animateSteps() {
+            const steps = [
+                { id: 'step-plan',  threshold: 0   },
+                { id: 'step-rag',   threshold: 20  },
+                { id: 'step-web',   threshold: 60  },
+                { id: 'step-draft', threshold: 100 },
+                { id: 'step-verify',threshold: 240 },
+            ];
+
+            for (let i = 0; i < steps.length; i++) {
+                const el = document.getElementById(steps[i].id);
+                if (elapsedSeconds >= steps[i].threshold) {
+                    // Check if next step has started
+                    const nextThreshold = steps[i + 1] ? steps[i + 1].threshold : 99999;
+                    if (elapsedSeconds >= nextThreshold) {
+                        el.className = 'progress-step done';
+                    } else {
+                        el.className = 'progress-step active';
+                    }
+                } else {
+                    el.className = 'progress-step';
+                }
+            }
+        }
+
+        // ── Trace Rendering ───────────────────────────────────────
+
+        function renderTrace(traceEntries) {
+            /*
+             * Renders all trace entries at once after the backend responds.
+             * Each entry gets an icon and color based on which agent
+             * generated it.
+             */
+            const panel = document.getElementById('tracePanel');
+            panel.innerHTML = '<div class="trace-list" id="traceList"></div>';
+            const list = document.getElementById('traceList');
+
+            for (const text of traceEntries) {
+                let cls = '', icon = '→';
+                const t = text.toLowerCase();
+
+                if (t.includes('planner') || t.includes('session')) {
+                    cls = 'planner'; icon = '🧠';
+                } else if (t.includes('rag') || t.includes('retrieval') || t.includes('pubmed')) {
+                    cls = 'tool'; icon = '📚';
+                } else if (t.includes('search')) {
+                    cls = 'tool'; icon = '🔍';
+                } else if (t.includes('reddit')) {
+                    cls = 'tool'; icon = '💬';
+                } else if (t.includes('draft') || t.includes('generator')) {
+                    cls = 'draft'; icon = '✍️';
+                } else if (t.includes('verif')) {
+                    cls = 'verifier'; icon = '✓';
+                } else if (t.includes('human') || t.includes('checkpoint') || t.includes('awaiting')) {
+                    cls = 'human'; icon = '👤';
+                } else if (t.includes('final') || t.includes('output') || t.includes('memory')) {
+                    cls = 'output'; icon = '✅';
+                }
+
+                const entry = document.createElement('div');
+                entry.className = `trace-entry ${cls}`;
+                entry.innerHTML = `
+                    <span class="trace-icon">${icon}</span>
+                    <span class="trace-text">${escapeHtml(text)}</span>
+                `;
+                list.appendChild(entry);
+            }
+
+            document.getElementById('traceBadge').textContent =
+                `${traceEntries.length} steps`;
+        }
+
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.appendChild(document.createTextNode(text));
+            return d.innerHTML;
+        }
+
+        // ── Main Query Function ───────────────────────────────────
+
+        async function submitQuery() {
+            /*
+             * Calls POST /api/v1/query and waits for the response.
+             *
+             * The backend runs the full pipeline (planner → tools → draft →
+             * verifier) and returns when the graph pauses at the human
+             * checkpoint. This takes 2-10 minutes with a local LLM.
+             *
+             * While waiting, we show an animated progress indicator.
+             *
+             * When the response arrives:
+             * - Show the two-panel layout with trace + draft
+             * - Enable the Approve button
+             */
+
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query || isRunning) return;
+
+            clearError();
+            setRunning(true);
+            setStatus('loading');
+            currentSessionId = null;
+
+            // Hide previous results
+            document.getElementById('panels').classList.remove('visible');
+            document.getElementById('finalSection').classList.remove('visible');
+            document.getElementById('approveSection').style.display = 'none';
+            document.getElementById('sessionInfo').textContent = '';
+
+            // Show progress indicator
+            showProgress();
+
+            try {
+                /*
+                 * fetch() with a long timeout.
+                 * The backend may take up to 10+ minutes.
+                 * Default browser fetch timeout is usually 30+ seconds,
+                 * but we don't set an explicit one - let it wait as long
+                 * as needed.
+                 */
+                const response = await fetch(`${BACKEND_URL}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query }),
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `Server error ${response.status}`);
+                }
+
+                const result = await response.json();
+                currentSessionId = result.session_id;
+
+                // Stop progress animation
+                stopTimer();
+                hideProgress();
+
+                // Show session ID
+                document.getElementById('sessionInfo').textContent =
+                    `Session: ${result.session_id}`;
+
+                // Render trace
+                renderTrace(result.trace || []);
+
+                // Render draft
+                const draftPanel = document.getElementById('draftPanel');
+                if (result.draft_answer) {
+                    draftPanel.innerHTML =
+                        `<div class="draft-content">${escapeHtml(result.draft_answer)}</div>`;
+                } else {
+                    draftPanel.innerHTML =
+                        `<div style="color:var(--text-muted);padding:20px;text-align:center;">
+                            No draft generated. Check server logs.
+                        </div>`;
+                }
+
+                // Show panels
+                document.getElementById('panels').classList.add('visible');
+                document.getElementById('approveSection').style.display = 'block';
+                document.getElementById('approveBtn').disabled = false;
+
+                setStatus('waiting');
+                setRunning(false);
+
+            } catch (error) {
+                showError(
+                    `Request failed: ${error.message}. ` +
+                    `Make sure the backend is running at localhost:8000.`
+                );
+            }
+        }
+
+        // ── Approval Function ──────────────────────────────────────
+
+        async function approveDraft() {
+            /*
+             * Calls POST /api/v1/approve with the session_id.
+             *
+             * The backend resumes the paused graph:
+             * human_checkpoint_node → final_output_node → END
+             *
+             * This is fast (a few seconds) because the LLM only
+             * does minimal work in final_output_node.
+             */
+
+            if (!currentSessionId) {
+                showError('No active session. Please submit a query first.');
+                return;
+            }
+
+            const btn = document.getElementById('approveBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Generating final answer...';
+            setStatus('loading');
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        approved: true,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `Approval failed ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // Add final trace entries
+                if (result.trace && result.trace.length > 0) {
+                    const list = document.getElementById('traceList');
+                    if (list) {
+                        // Append new trace entries from the final nodes
+                        for (const text of result.trace.slice(-3)) {
+                            const entry = document.createElement('div');
+                            entry.className = 'trace-entry output';
+                            entry.innerHTML = `
+                                <span class="trace-icon">✅</span>
+                                <span class="trace-text">${escapeHtml(text)}</span>
+                            `;
+                            list.appendChild(entry);
+                        }
+                        // Update count
+                        document.getElementById('traceBadge').textContent =
+                            `${list.children.length} steps`;
+                    }
+                }
+
+                // Show final answer
+                if (result.final_answer) {
+                    document.getElementById('finalContent').textContent = result.final_answer;
+
+                    // Show tools used as tags
+                    const toolNames = {
+                        'rag':             '📚 PubMed Research',
+                        'internet_search': '🔍 Web Search',
+                        'reddit':          '💬 Reddit Community',
+                    };
+                    const toolsEl = document.getElementById('toolsUsed');
+                    toolsEl.innerHTML = '';
+
+                    // Extract tools from trace
+                    const usedTools = new Set();
+                    const allTrace = [...(result.trace || [])];
+                    for (const entry of allTrace) {
+                        const e = entry.toLowerCase();
+                        if (e.includes('rag') || e.includes('pubmed')) usedTools.add('rag');
+                        if (e.includes('search') && !e.includes('reddit'))  usedTools.add('internet_search');
+                        if (e.includes('reddit')) usedTools.add('reddit');
+                    }
+
+                    for (const tool of usedTools) {
+                        const tag = document.createElement('span');
+                        tag.className = 'tool-tag';
+                        tag.textContent = toolNames[tool] || tool;
+                        toolsEl.appendChild(tag);
+                    }
+
+                    document.getElementById('finalSection').classList.add('visible');
+                    document.getElementById('finalSection').scrollIntoView({
+                        behavior: 'smooth', block: 'start'
+                    });
+                }
+
+                // Update draft badge
+                document.getElementById('draftBadge').textContent = 'Approved';
+                document.getElementById('draftBadge').className = 'panel-badge done';
+
+                // Hide approve button
+                document.getElementById('approveSection').style.display = 'none';
+
+                setStatus('complete');
+
+            } catch (error) {
+                showError(`Approval failed: ${error.message}`);
+                btn.disabled = false;
+                btn.textContent = '✓ Approve & Generate Final Answer';
+            }
+        }
+
+        // ── Keyboard shortcut ─────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('queryInput').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !isRunning) submitQuery();
+            });
+        });
+
+    </script>
+</body>
+</html>
